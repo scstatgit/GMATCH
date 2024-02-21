@@ -8,3 +8,9 @@ Original SAS code: https://support.sas.com/resources/papers/proceedings/proceedi
 
 ## GMATCH
 Greedy match can be used in case-control 1:N matching for epidemiological studies. However, I am having trouble with the 'remove of 1:(equal or less than N-1) matched case' in the original SAS code, which can be found at the URL below for exact matching. If you are experiencing the same issue, you can use this code to solve it.
+
+
+## PSMatch_Multi
+PS match can be used in case-control 1:N matching for epidemiological studies.
+This code is PS match with simple example.
+
