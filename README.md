@@ -13,4 +13,6 @@ Greedy match can be used in case-control 1:N matching for epidemiological studie
 ## PSMatch_Multi
 PS match can be used in case-control 1:N matching for epidemiological studies.
 This code is PS match with simple example.
+Original SAS code: https://support.sas.com/resources/papers/proceedings17/0812-2017.pdf
+
 
