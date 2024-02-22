@@ -436,7 +436,6 @@ cntl_psvar = pscore,
 group = group,
 match_dsn = matched_pairs3, 
 match_ratio = 1,
-opt = close,
 score_diff = 0.001
 );
 
