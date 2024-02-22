@@ -19,6 +19,7 @@ subj_psvar=, /* Propensity Score variable in &SUBJ_DSN */
 cntl_dsn=, /* Data set with control data */
 cntl_idvar=, /* Control ID variable in data set &CNTL_DSN */
 cntl_psvar=, /* Propensity Score variable in &CNTL_DSN */
+group=, /* must coded disease as 1, healthy as 0 */
 match_dsn=, /* Output data set */
 match_ratio=, /* Number of matches per subject */
 score_diff=, /* Maximum allowable absolute differences between propensity scores*/
@@ -284,11 +285,66 @@ run;
 PROC SORT data=__subjmatch_orig;
 by subj_idvar;
 run;
+DATA __propensity_socres_orig;
+set propensity_scores (rename= (&subj_idvar = subj_idvar 
+&subj_psvar = subj_score));
+run;
+PROC SORT data=__propensity_socres_orig;
+by subj_idvar;
+run;
 DATA &match_dsn (label="Final Matched Pairs for PS Matching");
 merge __final_matched_pairs
 __subjmatch_orig;
 by subj_idvar subj_score;
 run;
+DATA &match_dsn._vars_1 (label="Final Matched Pairs for PS Matching with Variables");
+merge __final_matched_pairs(in=in1)
+__propensity_socres_orig(in=in2);
+by subj_idvar subj_score;
+if in1 and in2;
+run;
+PROC SORT data=__final_matched_pairs;
+by cntl_idvar;
+run; 
+DATA __propensity_socres_orig;
+set propensity_scores (rename= (&cntl_idvar = cntl_idvar 
+&cntl_psvar = cntl_score));
+run;
+PROC SORT data=__propensity_socres_orig;
+by cntl_idvar;
+run;
+DATA &match_dsn._vars_2 (label="Final Matched Pairs for PS Matching with Variables");
+merge __final_matched_pairs(in=in1)
+__propensity_socres_orig(in=in2);
+by cntl_idvar;
+if in1 and in2;
+run;
+PROC SORT data=&match_dsn._vars_1;
+by subj_idvar descending &group;
+run;
+PROC SORT data=&match_dsn._vars_2;
+by subj_idvar descending &group;
+run;
+DATA &match_dsn._vars (drop=cntl_idvar subj_idvar subj_score cntl_score rename=(subj_idvar2=subj_idvar subj_score2=subj_score)
+										label="Final Matched Pairs for PS Matching with Variables");
+length subj_idvar2 seq &group subj_score2 8;
+set &match_dsn._vars_1(in=in1) &match_dsn._vars_2(in=in2);
+by subj_idvar;
+if first.subj_idvar then do;
+seq+1;
+cntl_score=.;
+end;
+if in1 then cntl_idvar='';
+if in2 then subj_idvar='';
+subj_idvar2=coalesce(subj_idvar, cntl_idvar);
+subj_score2=coalesce(cntl_score, subj_score);
+label subj_idvar2 = 
+"Subject ID, original variable name &subj_idvar"
+subj_score2 = 
+"Subject Propensity Score, original var name &subj_psvar"
+;
+run;
+PROC SORT data=&match_dsn._vars nodupkey; by seq descending &group subj_idvar; run;
 /***************************************************/
 /* Delete all temporary datasets created by macro 
 /***************************************************/
@@ -299,7 +355,8 @@ __match_remove_cont __match_remove_subj
 __new_matched_pairs __subjmatch __subjmatch_orig 
 __possible_matches __remove_cont 
 __first_subj_idvar __all_first_id 
-__new_matched_subj;
+__new_matched_subj
+&match_dsn._vars_1 &match_dsn._vars_2;
 run;
 quit; 
 %mend psmatch_multi;
@@ -313,7 +370,7 @@ run;
 PROC LOGISTIC data=ddd descending;
 class origin;
 model group = origin Invoice EngineSize Cylinders Horsepower MPG_city MPG_highway;
-output out=propensity_scores pred = prob_treat;
+output out=propensity_scores pred = pscore;
 run;
 
 
@@ -336,14 +393,16 @@ run;
 %psmatch_multi(
 subj_dsn = prop_score_treated,
 subj_idvar = id,
-subj_psvar = prob_treat,
+subj_psvar = pscore,
 cntl_dsn = prop_score_untreated, 
 cntl_idvar = id,
-cntl_psvar = prob_treat, 
+cntl_psvar = pscore, 
+group = group,
 match_dsn = matched_pairs1, 
 match_ratio = 1,
 score_diff = 0.01
 );
+
 
 /************************************************************************/
 /* 2:1 Matching with an absolute difference between propensity scores
@@ -352,14 +411,16 @@ score_diff = 0.01
 %psmatch_multi(
 subj_dsn = prop_score_treated,
 subj_idvar = id,
-subj_psvar = prob_treat,
+subj_psvar = pscore,
 cntl_dsn = prop_score_untreated, 
 cntl_idvar = id,
-cntl_psvar = prob_treat,
+cntl_psvar = pscore,
+group = group,
 match_dsn = matched_pairs2,
 match_ratio = 2,
-opt = num,
-score_diff = 0.05);
+score_diff = 0.05
+);
+
 
 /************************************************************************/
 /* 1:1 Matching with an absolute difference between propensity scores
@@ -368,12 +429,31 @@ score_diff = 0.05);
 %psmatch_multi(
 subj_dsn = prop_score_treated,
 subj_idvar = id,
-subj_psvar = prob_treat,
+subj_psvar = pscore,
 cntl_dsn = prop_score_untreated, 
 cntl_idvar = id,
-cntl_psvar = prob_treat, 
+cntl_psvar = pscore, 
+group = group,
 match_dsn = matched_pairs3, 
 match_ratio = 1,
 opt = close,
 score_diff = 0.001
+);
+
+
+/************************************************************************/
+/* 4:1 Matching with an absolute difference between propensity scores
+/* of 0.01, matching optimized for number of matches
+/************************************************************************/
+%psmatch_multi(
+subj_dsn = prop_score_treated,
+subj_idvar = id,
+subj_psvar = pscore,
+cntl_dsn = prop_score_untreated, 
+cntl_idvar = id,
+cntl_psvar = pscore,
+group = group,
+match_dsn = matched_pairs4,
+match_ratio = 4,
+score_diff = 0.01
 );
