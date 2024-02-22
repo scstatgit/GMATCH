@@ -1,4 +1,4 @@
-# MATCH with SAS 9.4
+# MATCH Algorithm on SAS v9.4
 
 
 ## GMATCH
